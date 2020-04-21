@@ -1,0 +1,116 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectName>UnityCapturePlugin</ProjectName>
+    <RootNamespace>UnityCapturePlugin</RootNamespace>
+    <ProjectGuid>{727D3AC5-27B5-4288-A475-7A471ECD71B8}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset Condition="'$(VisualStudioVersion)' == '11.0' Or '$(PlatformToolsetVersion)' == '110' Or '$(MSBuildToolsVersion)' ==  '4.0'">v110_xp</PlatformToolset>
+    <PlatformToolset Condition="'$(VisualStudioVersion)' == '12.0' Or '$(PlatformToolsetVersion)' == '120' Or '$(MSBuildToolsVersion)' == '12.0'">v120_xp</PlatformToolset>
+    <PlatformToolset Condition="'$(VisualStudioVersion)' == '14.0' Or '$(PlatformToolsetVersion)' == '140' Or '$(MSBuildToolsVersion)' == '14.0'">v140</PlatformToolset>
+    <PlatformToolset Condition="'$(VisualStudioVersion)' == '15.0' Or '$(PlatformToolsetVersion)' == '141' Or '$(MSBuildToolsVersion)' == '15.0'">v141</PlatformToolset>
+    <UseOfMfc>false</UseOfMfc>
+    <CharacterSet>MultiByte</CharacterSet>
+    <WholeProgramOptimization Condition="'$(Configuration)'=='Release'">true</WholeProgramOptimization>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup>
+    <OutDir Condition="'$(Platform)'=='x64'">Build\$(Configuration)-$(TargetName)64bit\</OutDir>
+    <OutDir Condition="'$(Platform)'=='Win32'">Build\$(Configuration)-$(TargetName)32bit\</OutDir>
+    <IntDir>$(OutDir)</IntDir>
+    <GenerateManifest>false</GenerateManifest>
+    <LinkIncremental Condition="'$(Configuration)'=='Debug'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)'=='Release'">false</LinkIncremental>
+    <LocalDebuggerCommand>$(ProgramW6432)\Unity\Editor\Unity.exe</LocalDebuggerCommand>
+    <LocalDebuggerCommandArguments>-projectPath "$(ProjectDir)..\UnityCaptureSample"</LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <WarningLevel>Level3</WarningLevel>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <ExceptionHandling>false</ExceptionHandling>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+    </ClCompile>
+    <ClCompile Condition="'$(Configuration)'=='Debug'">
+      <PreprocessorDefinitions>Win32;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Optimization>Disabled</Optimization>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+    </ClCompile>
+    <ClCompile Condition="'$(Configuration)'=='Release'">
+      <PreprocessorDefinitions>Win32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Optimization>Full</Optimization>
+      <StringPooling>true</StringPooling>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <OmitFramePointers>true</OmitFramePointers>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <FloatingPointExceptions>false</FloatingPointExceptions>
+      <EnableEnhancedInstructionSet Condition="'$(Platform)'=='Win32'">StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <AdditionalOptions Condition="'$(VisualStudioVersion)' &gt;= '12.0' Or '$(PlatformToolsetVersion)' &gt;= '120' Or '$(MSBuildToolsVersion)' &gt;= '12.0'">/Gw %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SuppressStartupBanner>true</SuppressStartupBanner>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+      <AdditionalDependencies>opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <Link Condition="'$(Configuration)'=='Release'">
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <IgnoreEmbeddedIDL>true</IgnoreEmbeddedIDL>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+        SETLOCAL
+        SET TARGET_PLUGIN_DIR=x86
+        IF NOT "$(PlatformShortName)" == "x86" SET TARGET_PLUGIN_DIR=x86_64
+        echo Copying output $(OutDir)$(TargetName) DLL and PDB to "$(SolutionDir)..\UnityCaptureSample\Assets\UnityCapture\Plugins\%TARGET_PLUGIN_DIR%\"
+        mkdir "$(SolutionDir)..\UnityCaptureSample\Assets\UnityCapture\Plugins\%TARGET_PLUGIN_DIR%" 2&gt;nul
+        copy /Y "$(SolutionDir)$(OutDir)$(TargetName).dll" "$(SolutionDir)..\UnityCaptureSample\Assets\UnityCapture\Plugins\%TARGET_PLUGIN_DIR%\"
+        copy /Y "$(SolutionDir)$(OutDir)$(TargetName).pdb" "$(SolutionDir)..\UnityCaptureSample\Assets\UnityCapture\Plugins\%TARGET_PLUGIN_DIR%\"
+        ENDLOCAL
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="UnityCapturePlugin.cpp" />
+    <ClInclude Include="IUnityGraphics.h" />
+    <ClInclude Include="IUnityInterface.h" />
+    <None Include="shared.inl" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
