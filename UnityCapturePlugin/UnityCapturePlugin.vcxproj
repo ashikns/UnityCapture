@@ -53,9 +53,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup>
-    <OutDir Condition="'$(Platform)'=='x64'">Build\$(Configuration)\$(PlatformTarget)</OutDir>
-    <OutDir Condition="'$(Platform)'=='Win32'">Build\$(Configuration)\$(PlatformTarget)</OutDir>
-    <IntDir>Int/$(Configuration)/$(Platform)</IntDir>
+    <OutDir Condition="'$(Platform)'=='x64'">Build\Desktop\$(Configuration)\$(PlatformTarget)\</OutDir>
+    <OutDir Condition="'$(Platform)'=='Win32'">Build\Desktop\$(Configuration)\$(PlatformTarget)\</OutDir>
+    <IntDir>Int\Desktop\$(Configuration)\$(Platform)\</IntDir>
     <GenerateManifest>false</GenerateManifest>
     <LinkIncremental Condition="'$(Configuration)'=='Debug'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)'=='Release'">false</LinkIncremental>
@@ -111,15 +111,9 @@
       <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
     </Link>
     <PostBuildEvent>
-      <Command>
-        SETLOCAL
-        SET TARGET_PLUGIN_DIR=x86
-        IF NOT "$(PlatformShortName)" == "x86" SET TARGET_PLUGIN_DIR=x86_64
-        echo Copying output $(OutDir)$(TargetName) DLL and PDB to "$(SolutionDir)..\UnityCaptureSample\Assets\UnityCapture\Plugins\%TARGET_PLUGIN_DIR%\"
-        mkdir "$(SolutionDir)..\UnityCaptureSample\Assets\UnityCapture\Plugins\%TARGET_PLUGIN_DIR%" 2&gt;nul
-        copy /Y "$(SolutionDir)$(OutDir)$(TargetName).dll" "$(SolutionDir)..\UnityCaptureSample\Assets\UnityCapture\Plugins\%TARGET_PLUGIN_DIR%\"
-        copy /Y "$(SolutionDir)$(OutDir)$(TargetName).pdb" "$(SolutionDir)..\UnityCaptureSample\Assets\UnityCapture\Plugins\%TARGET_PLUGIN_DIR%\"
-        ENDLOCAL
+      <Command>mkdir "$(SolutionDir)..\UnityCaptureSample\Assets\UnityCapture\Plugins\$(PlatformTarget)" 2&gt;nul
+copy /Y "$(SolutionDir)$(OutDir)$(TargetName).dll" "$(SolutionDir)..\UnityCaptureSample\Assets\UnityCapture\Plugins\$(PlatformTarget)\"
+copy /Y "$(SolutionDir)$(OutDir)$(TargetName).pdb" "$(SolutionDir)..\UnityCaptureSample\Assets\UnityCapture\Plugins\$(PlatformTarget)\"
       </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>

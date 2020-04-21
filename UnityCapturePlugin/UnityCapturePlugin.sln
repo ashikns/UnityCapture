@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.40629.0
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30011.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnityCapturePlugin", "UnityCapturePlugin.vcxproj", "{727D3AC5-27B5-4288-A475-7A471ECD71B8}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnityCapturePluginUniversal", "UnityCapturePluginUniversal.vcxproj", "{05BD8F28-8B30-4906-BC4B-0E0D8D34A6A1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,8 +23,19 @@ Global
 		{727D3AC5-27B5-4288-A475-7A471ECD71B8}.Release|Win32.Build.0 = Release|Win32
 		{727D3AC5-27B5-4288-A475-7A471ECD71B8}.Release|x64.ActiveCfg = Release|x64
 		{727D3AC5-27B5-4288-A475-7A471ECD71B8}.Release|x64.Build.0 = Release|x64
+		{05BD8F28-8B30-4906-BC4B-0E0D8D34A6A1}.Debug|Win32.ActiveCfg = Debug|Win32
+		{05BD8F28-8B30-4906-BC4B-0E0D8D34A6A1}.Debug|Win32.Build.0 = Debug|Win32
+		{05BD8F28-8B30-4906-BC4B-0E0D8D34A6A1}.Debug|x64.ActiveCfg = Debug|x64
+		{05BD8F28-8B30-4906-BC4B-0E0D8D34A6A1}.Debug|x64.Build.0 = Debug|x64
+		{05BD8F28-8B30-4906-BC4B-0E0D8D34A6A1}.Release|Win32.ActiveCfg = Release|Win32
+		{05BD8F28-8B30-4906-BC4B-0E0D8D34A6A1}.Release|Win32.Build.0 = Release|Win32
+		{05BD8F28-8B30-4906-BC4B-0E0D8D34A6A1}.Release|x64.ActiveCfg = Release|x64
+		{05BD8F28-8B30-4906-BC4B-0E0D8D34A6A1}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {0DE60BA1-7DCA-4788-A428-71B16EEF74B3}
 	EndGlobalSection
 EndGlobal

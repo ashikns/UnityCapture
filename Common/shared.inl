@@ -12,6 +12,8 @@
 #include <windows.h>
 #include <initguid.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <AclAPI.h>
 
 #define MAX_SHARED_IMAGE_SIZE (3840 * 2160 * 4 * sizeof(short)) //4K (RGBA max 16bit per pixel)
 
@@ -98,6 +100,181 @@ struct SharedImageMemory
 	}
 
 private:
+	//Allow UWP apps access to named objects:
+	//https://docs.microsoft.com/en-us/windows/win32/api/securityappcontainer/nf-securityappcontainer-getappcontainernamedobjectpath#examples
+
+	BOOL GetLogonSid(PSID* ppsid)
+	{
+		HANDLE hToken = NULL;
+		BOOL bSuccess = FALSE;
+		DWORD dwLength = 0;
+		PTOKEN_GROUPS ptg = NULL;
+
+		// Verify the parameter passed in is not NULL.
+		if (NULL == ppsid)
+		{
+			goto Cleanup;
+		}
+
+		if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken))
+		{
+			goto Cleanup;
+		}
+
+		// Get required buffer size and allocate the TOKEN_GROUPS buffer.
+
+		if (!GetTokenInformation(
+			hToken,         // handle to the access token
+			TokenLogonSid,    // get information about the token's groups 
+			(LPVOID)ptg,   // pointer to TOKEN_GROUPS buffer
+			0,              // size of buffer
+			&dwLength       // receives required buffer size
+		))
+		{
+			if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+				goto Cleanup;
+
+			ptg = (PTOKEN_GROUPS)HeapAlloc(GetProcessHeap(),
+				HEAP_ZERO_MEMORY, dwLength);
+
+			if (ptg == NULL)
+				goto Cleanup;
+		}
+
+		// Get the token group information from the access token.
+
+		if (!GetTokenInformation(
+			hToken,         // handle to the access token
+			TokenLogonSid,    // get information about the token's groups 
+			(LPVOID)ptg,   // pointer to TOKEN_GROUPS buffer
+			dwLength,       // size of buffer
+			&dwLength       // receives required buffer size
+		) || ptg->GroupCount != 1)
+		{
+			goto Cleanup;
+		}
+
+		// Found the logon SID; make a copy of it.
+
+		dwLength = GetLengthSid(ptg->Groups[0].Sid);
+		*ppsid = (PSID)HeapAlloc(GetProcessHeap(),
+			HEAP_ZERO_MEMORY, dwLength);
+		if (*ppsid == NULL)
+			goto Cleanup;
+		if (!CopySid(dwLength, *ppsid, ptg->Groups[0].Sid))
+		{
+			HeapFree(GetProcessHeap(), 0, (LPVOID)*ppsid);
+			goto Cleanup;
+		}
+
+		bSuccess = TRUE;
+
+	Cleanup:
+
+		// Free the buffer for the token groups.
+
+		if (hToken)
+			CloseHandle(hToken);
+
+		if (ptg != NULL)
+			HeapFree(GetProcessHeap(), 0, (LPVOID)ptg);
+
+		return bSuccess;
+	}
+
+	BOOL CreateObjectSecurityDescriptor(PSECURITY_DESCRIPTOR* ppSD, DWORD permissions)
+	{
+		PSID pLogonSid = NULL;
+		BOOL bSuccess = FALSE;
+		DWORD dwRes;
+		PSID pAllAppsSID = NULL;
+		PACL pACL = NULL;
+		PSECURITY_DESCRIPTOR pSD = NULL;
+		EXPLICIT_ACCESS ea[2];
+		SID_IDENTIFIER_AUTHORITY ApplicationAuthority = SECURITY_APP_PACKAGE_AUTHORITY;
+
+		if (!GetLogonSid(&pLogonSid))
+		{
+			goto Cleanup;
+		}
+
+		// Create a well-known SID for the all appcontainers group.
+		if (!AllocateAndInitializeSid(&ApplicationAuthority,
+			SECURITY_BUILTIN_APP_PACKAGE_RID_COUNT,
+			SECURITY_APP_PACKAGE_BASE_RID,
+			SECURITY_BUILTIN_PACKAGE_ANY_PACKAGE,
+			0, 0, 0, 0, 0, 0,
+			&pAllAppsSID))
+		{
+			goto Cleanup;
+		}
+
+		// Initialize an EXPLICIT_ACCESS structure for an ACE.
+		// The ACE will allow LogonSid generic all access
+		ZeroMemory(&ea, 2 * sizeof(EXPLICIT_ACCESS));
+		ea[0].grfAccessPermissions = permissions;
+		ea[0].grfAccessMode = SET_ACCESS;
+		ea[0].grfInheritance = NO_INHERITANCE;
+		ea[0].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+		ea[0].Trustee.TrusteeType = TRUSTEE_IS_USER;
+		ea[0].Trustee.ptstrName = (LPTSTR)pLogonSid;
+
+		// Initialize an EXPLICIT_ACCESS structure for an ACE.
+		// The ACE will allow the all appcontainers execute permission
+		ea[1].grfAccessPermissions = permissions;
+		ea[1].grfAccessMode = SET_ACCESS;
+		ea[1].grfInheritance = NO_INHERITANCE;
+		ea[1].Trustee.TrusteeForm = TRUSTEE_IS_SID;
+		ea[1].Trustee.TrusteeType = TRUSTEE_IS_GROUP;
+		ea[1].Trustee.ptstrName = (LPTSTR)pAllAppsSID;
+
+		// Create a new ACL that contains the new ACEs.
+		dwRes = SetEntriesInAcl(2, ea, NULL, &pACL);
+		if (ERROR_SUCCESS != dwRes)
+		{
+			goto Cleanup;
+		}
+
+		// Initialize a security descriptor.  
+		pSD = (PSECURITY_DESCRIPTOR)LocalAlloc(LPTR,
+			SECURITY_DESCRIPTOR_MIN_LENGTH);
+		if (NULL == pSD)
+		{
+			goto Cleanup;
+		}
+
+		if (!InitializeSecurityDescriptor(pSD,
+			SECURITY_DESCRIPTOR_REVISION))
+		{
+			goto Cleanup;
+		}
+
+		// Add the ACL to the security descriptor. 
+		if (!SetSecurityDescriptorDacl(pSD,
+			TRUE,     // bDaclPresent flag   
+			pACL,
+			FALSE))   // not a default DACL 
+		{
+			goto Cleanup;
+		}
+
+		*ppSD = pSD;
+		pSD = NULL;
+		bSuccess = TRUE;
+
+	Cleanup:
+		if (pLogonSid)
+			HeapFree(GetProcessHeap(), 0, (LPVOID)pLogonSid);
+		if (pAllAppsSID)
+			FreeSid(pAllAppsSID);
+		if (pACL)
+			LocalFree(pACL);
+		if (pSD)
+			LocalFree(pSD);
+
+		return bSuccess;
+	}
+
 	bool Open(bool ForReceiving)
 	{
 		if (m_pSharedBuf)
@@ -121,9 +298,35 @@ private:
 		char CS_NAME_SHARED_DATA[] = "UnityCapture_Data0";
 		CS_NAME_SHARED_DATA[sizeof(CS_NAME_SHARED_DATA) - 2] = CSCapNumChar;
 
+		size_t converted;
+		wchar_t CS_NAME_SHARED_DATA_W[19];
+		mbstowcs_s(&converted, CS_NAME_SHARED_DATA_W, CS_NAME_SHARED_DATA, 19);
+
 		if (!m_hMutex)
 		{
-			m_hMutex = ForReceiving ? CreateMutexA(NULL, FALSE, CS_NAME_MUTEX) : OpenMutexA(SYNCHRONIZE, FALSE, CS_NAME_MUTEX);
+			if (ForReceiving)
+			{
+				PSECURITY_DESCRIPTOR pSd = NULL;
+				if (CreateObjectSecurityDescriptor(&pSd, STANDARD_RIGHTS_ALL | MUTEX_ALL_ACCESS))
+				{
+					SECURITY_ATTRIBUTES SecurityAttributes;
+					SecurityAttributes.nLength = sizeof(SECURITY_ATTRIBUTES);
+					SecurityAttributes.bInheritHandle = TRUE;
+					SecurityAttributes.lpSecurityDescriptor = pSd;
+
+					m_hMutex = CreateMutexA(&SecurityAttributes, FALSE, CS_NAME_MUTEX);
+
+					LocalFree(pSd);
+				}
+				else
+				{
+					m_hMutex = CreateMutexA(NULL, FALSE, CS_NAME_MUTEX);
+				}
+			}
+			else
+			{
+				m_hMutex = OpenMutexA(SYNCHRONIZE, FALSE, CS_NAME_MUTEX);
+			}
 			if (!m_hMutex) { return false; }
 		}
 
@@ -140,20 +343,112 @@ private:
 
 		if (!m_hWantFrameEvent)
 		{
-			m_hWantFrameEvent = ForReceiving ? OpenEventA(EVENT_MODIFY_STATE, FALSE, CS_NAME_EVENT_WANT) : CreateEventA(NULL, FALSE, FALSE, CS_NAME_EVENT_WANT);
+			if (ForReceiving)
+			{
+				PSECURITY_DESCRIPTOR pSd = NULL;
+				if (CreateObjectSecurityDescriptor(&pSd, STANDARD_RIGHTS_ALL | EVENT_ALL_ACCESS))
+				{
+					SECURITY_ATTRIBUTES SecurityAttributes;
+					SecurityAttributes.nLength = sizeof(SECURITY_ATTRIBUTES);
+					SecurityAttributes.bInheritHandle = TRUE;
+					SecurityAttributes.lpSecurityDescriptor = pSd;
+
+					m_hWantFrameEvent = CreateEventA(&SecurityAttributes, FALSE, FALSE, CS_NAME_EVENT_WANT);
+
+					LocalFree(pSd);
+				}
+				else
+				{
+					m_hWantFrameEvent = CreateEventA(NULL, FALSE, FALSE, CS_NAME_EVENT_WANT);
+				}
+			}
+			else
+			{
+				m_hWantFrameEvent = OpenEventA(SYNCHRONIZE, FALSE, CS_NAME_EVENT_WANT);
+			}
 			if (!m_hWantFrameEvent) { return false; }
 		}
 
 		if (!m_hSentFrameEvent)
 		{
-			m_hSentFrameEvent = ForReceiving ? CreateEventA(NULL, FALSE, FALSE, CS_NAME_EVENT_SENT) : OpenEventA(EVENT_MODIFY_STATE, FALSE, CS_NAME_EVENT_SENT);
+			if (ForReceiving)
+			{
+				PSECURITY_DESCRIPTOR pSd = NULL;
+				if (CreateObjectSecurityDescriptor(&pSd, STANDARD_RIGHTS_ALL | EVENT_ALL_ACCESS))
+				{
+					SECURITY_ATTRIBUTES SecurityAttributes;
+					SecurityAttributes.nLength = sizeof(SECURITY_ATTRIBUTES);
+					SecurityAttributes.bInheritHandle = TRUE;
+					SecurityAttributes.lpSecurityDescriptor = pSd;
+
+					m_hSentFrameEvent = CreateEventA(&SecurityAttributes, FALSE, FALSE, CS_NAME_EVENT_SENT);
+
+					LocalFree(pSd);
+				}
+				else
+				{
+					m_hSentFrameEvent = CreateEventA(NULL, FALSE, FALSE, CS_NAME_EVENT_SENT);
+				}
+			}
+			else
+			{
+				m_hSentFrameEvent = OpenEventA(EVENT_MODIFY_STATE, FALSE, CS_NAME_EVENT_SENT);
+			}
 			if (!m_hSentFrameEvent) { return false; }
 		}
 
 		if (!m_hSharedFile)
 		{
-			m_hSharedFile = ForReceiving ? CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, NULL, sizeof(SharedMemHeader) + MAX_SHARED_IMAGE_SIZE, CS_NAME_SHARED_DATA) : OpenFileMappingA(FILE_MAP_WRITE, FALSE, CS_NAME_SHARED_DATA);
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+#define CreateMap CreateFileMappingW
+#define OpenMap OpenFileMappingW
+#else
+#define CreateMap CreateFileMappingFromApp
+#define OpenMap OpenFileMappingFromApp
+#endif
+			if (ForReceiving)
+			{
+				PSECURITY_DESCRIPTOR pSd = NULL;
+				if (CreateObjectSecurityDescriptor(&pSd, STANDARD_RIGHTS_ALL | FILE_MAP_ALL_ACCESS))
+				{
+					SECURITY_ATTRIBUTES SecurityAttributes;
+					SecurityAttributes.nLength = sizeof(SECURITY_ATTRIBUTES);
+					SecurityAttributes.bInheritHandle = TRUE;
+					SecurityAttributes.lpSecurityDescriptor = pSd;
+
+					m_hSharedFile = CreateMap(
+						INVALID_HANDLE_VALUE,
+						&SecurityAttributes,
+						PAGE_READWRITE,
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+						NULL,
+#endif
+						sizeof(SharedMemHeader) + MAX_SHARED_IMAGE_SIZE,
+						CS_NAME_SHARED_DATA_W);
+
+					LocalFree(pSd);
+				}
+				else
+				{
+					m_hSharedFile = CreateMap(
+						INVALID_HANDLE_VALUE,
+						NULL,
+						PAGE_READWRITE,
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+						NULL,
+#endif
+						sizeof(SharedMemHeader) + MAX_SHARED_IMAGE_SIZE,
+						CS_NAME_SHARED_DATA_W);
+				}
+			}
+			else
+			{
+				m_hSharedFile = OpenMap(FILE_MAP_WRITE, FALSE, CS_NAME_SHARED_DATA_W);
+			}
 			if (!m_hSharedFile) { return false; }
+
+#undef CreateMap
+#undef OpenMap
 		}
 
 		m_pSharedBuf = (SharedMemHeader*)MapViewOfFile(m_hSharedFile, FILE_MAP_WRITE, 0, 0, 0);
