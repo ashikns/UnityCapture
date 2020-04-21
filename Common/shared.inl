@@ -35,6 +35,7 @@ struct SharedImageMemory
 		if (m_hWantFrameEvent) CloseHandle(m_hWantFrameEvent);
 		if (m_hSentFrameEvent) CloseHandle(m_hSentFrameEvent);
 		if (m_hSharedFile) CloseHandle(m_hSharedFile);
+		if (m_pSharedBuf) UnmapViewOfFile(m_pSharedBuf);
 	}
 
 	int32_t GetCapNum() { return m_CapNum; }
