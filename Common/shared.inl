@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <AclAPI.h>
 
-#define MAX_SHARED_IMAGE_SIZE (3840 * 2160 * 4 * sizeof(short)) //4K (RGBA max 16bit per pixel)
+#define MAX_SHARED_IMAGE_SIZE (1920 * 1080 * 4 * sizeof(short)) //4K (RGBA max 16bit per pixel)
 
 #if _DEBUG
 #define UCASSERT(cond) ((cond) ? ((void)0) : *(volatile int*)0 = 0xbad|(OutputDebugStringA("[FAILED ASSERT] " #cond "\n"),1))

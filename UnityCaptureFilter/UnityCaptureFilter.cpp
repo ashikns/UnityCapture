@@ -50,27 +50,7 @@ static struct { int width, height; } _media[] =
 {
 	{ 1920, 1080 }, //16:9
 	{ 1280,  720 }, //16:9
-	{  960,  540 }, //16:9
-	{  640,  360 }, //16:9
-	{  480,  270 }, //16:9
-	{  256,  144 }, //16:9
-	{ 2560, 1440 }, //16:9
-	{ 3840, 2160 }, //16:9
-	{ 1440, 1080 }, //4:3
-	{  960,  720 }, //4:3
-	{  640,  480 }, //4:3
-	{  480,  360 }, //4:3
-	{  320,  240 }, //4:3
-	{  192,  144 }, //4:3
-	{ 1920, 1440 }, //4:3
-	{ 2880, 2160 }, //4:3
-	{ 1920, 1200 }, //16:10
-	{ 1280,  800 }, //16:10
-	{ 2880, 1800 }, //16:10
-	{ 2560, 1600 }, //16:10
-	{ 1680, 1050 }, //16:10
-	{ 1440,  900 }, //16:10
-	{    0,    0 }, //This slot is used for custom resolutions if requested by the target application
+	//{    0,    0 }, //This slot is used for custom resolutions if requested by the target application
 };
 
 //Error draw modes (what to display on screen in case of errors/warnings)
