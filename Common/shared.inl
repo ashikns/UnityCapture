@@ -77,7 +77,7 @@ struct SharedImageMemory
 	{
 		UCASSERT(buffer);
 		UCASSERT(m_pSharedBuf);
-		if (m_pSharedBuf->maxSize < DataSize)
+		if (DataSize > MAX_SHARED_IMAGE_SIZE)
 		{
 			return SENDRES_TOOLARGE;
 		}
@@ -454,17 +454,11 @@ private:
 		m_pSharedBuf = (SharedMemHeader*)MapViewOfFile(m_hSharedFile, FILE_MAP_WRITE, 0, 0, 0);
 		if (!m_pSharedBuf) { return false; }
 
-		if (ForReceiving && m_pSharedBuf->maxSize != MAX_SHARED_IMAGE_SIZE)
-		{
-			m_pSharedBuf->maxSize = MAX_SHARED_IMAGE_SIZE;
-		}
-
 		return true;
 	}
 
 	struct SharedMemHeader
 	{
-		DWORD maxSize;
 		int width;
 		int height;
 		int stride;
