@@ -15,12 +15,26 @@
 #include <stdlib.h>
 #include <AclAPI.h>
 
-#define MAX_SHARED_IMAGE_SIZE (1920 * 1080 * 4 * sizeof(short)) //4K (RGBA max 16bit per pixel)
+#define DEFAULT_WIDTH 1280
+#define DEFAULT_HEIGHT 720
+#define MAX_WIDTH 3840
+#define MAX_HEIGHT 2160
+#define MAX_SHARED_IMAGE_SIZE (MAX_WIDTH * MAX_HEIGHT * 4 * sizeof(short)) //(RGBA max 16bit per pixel)
+
+#define RESOLUTION_FILE_NAME L"Unity Capture Resolution"
 
 #if _DEBUG
 #define UCASSERT(cond) ((cond) ? ((void)0) : *(volatile int*)0 = 0xbad|(OutputDebugStringA("[FAILED ASSERT] " #cond "\n"),1))
 #else
 #define UCASSERT(cond) ((void)0)
+#endif
+
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+#define CreateMap CreateFileMappingW
+#define OpenMap OpenFileMappingW
+#else
+#define CreateMap CreateFileMappingFromApp
+#define OpenMap OpenFileMappingFromApp
 #endif
 
 struct SharedImageMemory
@@ -38,6 +52,8 @@ struct SharedImageMemory
 		if (m_hSentFrameEvent) CloseHandle(m_hSentFrameEvent);
 		if (m_hSharedFile) CloseHandle(m_hSharedFile);
 		if (m_pSharedBuf) UnmapViewOfFile(m_pSharedBuf);
+		if (m_hResolutionFile) CloseHandle(m_hResolutionFile);
+		if (m_pResolutionData) UnmapViewOfFile(m_pResolutionData);
 	}
 
 	int32_t GetCapNum() { return m_CapNum; }
@@ -97,6 +113,86 @@ struct SharedImageMemory
 		bool DidSkipFrame = (WaitForSingleObject(m_hWantFrameEvent, 0) != WAIT_OBJECT_0);
 
 		return (DidSkipFrame ? SENDRES_WARN_FRAMESKIP : SENDRES_OK);
+	}
+
+	void GetResolution(int* width, int* height)
+	{
+		if (!m_pResolutionData)
+		{
+			if (!m_hResolutionFile) { m_hResolutionFile = OpenMap(FILE_MAP_WRITE, FALSE, RESOLUTION_FILE_NAME); }
+			if (m_hResolutionFile) { m_pResolutionData = (ResolutionHeader*)MapViewOfFile(m_hResolutionFile, FILE_MAP_WRITE, 0, 0, 0); }
+		}
+
+		if (!m_pResolutionData
+			|| m_pResolutionData->width > MAX_WIDTH || m_pResolutionData->height > MAX_HEIGHT
+			|| m_pResolutionData->width <= 0 || m_pResolutionData->height <= 0
+			|| m_pResolutionData->width % 4 != 0 || m_pResolutionData->height % 4 != 0)
+		{
+			*width = DEFAULT_WIDTH;
+			*height = DEFAULT_HEIGHT;
+		}
+		else
+		{
+			*width = m_pResolutionData->width;
+			*height = m_pResolutionData->height;
+		}
+	}
+
+	bool SetResolution(int width, int height)
+	{
+		if (width > MAX_WIDTH || height > MAX_HEIGHT
+			|| width <= 0 || height <= 0
+			|| width % 4 != 0 || height % 4 != 0)
+		{
+			return false;
+		}
+
+		if (!m_pResolutionData)
+		{
+			if (!m_hResolutionFile)
+			{
+				PSECURITY_DESCRIPTOR pSd = NULL;
+				if (CreateObjectSecurityDescriptor(&pSd, STANDARD_RIGHTS_ALL | FILE_MAP_ALL_ACCESS))
+				{
+					SECURITY_ATTRIBUTES SecurityAttributes;
+					SecurityAttributes.nLength = sizeof(SECURITY_ATTRIBUTES);
+					SecurityAttributes.bInheritHandle = TRUE;
+					SecurityAttributes.lpSecurityDescriptor = pSd;
+
+					m_hResolutionFile = CreateMap(
+						INVALID_HANDLE_VALUE,
+						&SecurityAttributes,
+						PAGE_READWRITE,
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+						NULL,
+#endif
+						sizeof(ResolutionHeader),
+						RESOLUTION_FILE_NAME);
+
+					LocalFree(pSd);
+				}
+				else
+				{
+					m_hResolutionFile = CreateMap(
+						INVALID_HANDLE_VALUE,
+						NULL,
+						PAGE_READWRITE,
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+						NULL,
+#endif
+						sizeof(ResolutionHeader),
+						RESOLUTION_FILE_NAME);
+				}
+			}
+			if (!m_hResolutionFile) { return false; }
+
+			m_pResolutionData = (ResolutionHeader*)MapViewOfFile(m_hResolutionFile, FILE_MAP_WRITE, 0, 0, 0);
+			if (!m_pResolutionData) { return false; }
+		}
+
+		m_pResolutionData->width = width;
+		m_pResolutionData->height = height;
+		return true;
 	}
 
 private:
@@ -399,13 +495,6 @@ private:
 
 		if (!m_hSharedFile)
 		{
-#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
-#define CreateMap CreateFileMappingW
-#define OpenMap OpenFileMappingW
-#else
-#define CreateMap CreateFileMappingFromApp
-#define OpenMap OpenFileMappingFromApp
-#endif
 			if (ForReceiving)
 			{
 				PSECURITY_DESCRIPTOR pSd = NULL;
@@ -446,9 +535,6 @@ private:
 				m_hSharedFile = OpenMap(FILE_MAP_WRITE, FALSE, CS_NAME_SHARED_DATA_W);
 			}
 			if (!m_hSharedFile) { return false; }
-
-#undef CreateMap
-#undef OpenMap
 		}
 
 		m_pSharedBuf = (SharedMemHeader*)MapViewOfFile(m_hSharedFile, FILE_MAP_WRITE, 0, 0, 0);
@@ -469,10 +555,18 @@ private:
 		uint8_t data[1];
 	};
 
+	struct ResolutionHeader
+	{
+		int width;
+		int height;
+	};
+
 	int32_t m_CapNum;
 	HANDLE m_hMutex;
 	HANDLE m_hWantFrameEvent;
 	HANDLE m_hSentFrameEvent;
 	HANDLE m_hSharedFile;
 	SharedMemHeader* m_pSharedBuf;
+	HANDLE m_hResolutionFile;
+	ResolutionHeader* m_pResolutionData;
 };

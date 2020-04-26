@@ -44,6 +44,7 @@ DEFINE_GUID(CLSID_UnityCaptureService,    0x5c2cd55c, 0x92ad, 0x4999, 0x86, 0x66
 DEFINE_GUID(CLSID_UnityCaptureProperties, 0x5c2cd55c, 0x92ad, 0x4999, 0x86, 0x66, 0x91, 0x2b, 0xd3, 0xe7, 0x00, 0x21);
 #endif
 
+/*
 //List of resolutions offered by this filter
 //If you add a higher resolution, make sure to update MAX_SHARED_IMAGE_SIZE
 static struct { int width, height; } _media[] =
@@ -52,6 +53,7 @@ static struct { int width, height; } _media[] =
 	{ 1280,  720 }, //16:9
 	//{    0,    0 }, //This slot is used for custom resolutions if requested by the target application
 };
+*/
 
 //Error draw modes (what to display on screen in case of errors/warnings)
 enum EErrorDrawCase { EDC_ResolutionMismatch, EDC_UnityNeverStarted, EDC_UnitySendingStopped, _EDC_MAX };
@@ -682,7 +684,7 @@ private:
 	{
 		if (piCount == NULL || piSize == NULL) DebugLog("[GetNumberOfCapabilities] E_POINTER\n");
 		if (piCount == NULL || piSize == NULL) return E_POINTER;
-		*piCount = (sizeof(_media)/sizeof(_media[0])*2); //RGB and RGBA variations
+		*piCount = 2; //RGB and RGBA variations
 		*piSize = sizeof(VIDEO_STREAM_CONFIG_CAPS);
 		DebugLog("[GetNumberOfCapabilities] Returning Count: %d - Size: %d\n", *piCount, *piSize);
 		return S_OK;
@@ -757,20 +759,21 @@ private:
 	{
 		CheckPointer(pMediaType, E_POINTER);
 		if (iPos < 0) return E_INVALIDARG;
-		if (iPos >= (sizeof(_media)/sizeof(_media[0])*2)) return VFW_S_NO_MORE_ITEMS;
-		CAutoLock cAutoLock(m_pFilter->pStateLock()); 
+		if (iPos >= 2) return VFW_S_NO_MORE_ITEMS;
 
-		int iMedia = iPos%(sizeof(_media)/sizeof(_media[0]));
-		UCASSERT(_media[iMedia].width * _media[iMedia].height * 4 * sizeof(short) <= MAX_SHARED_IMAGE_SIZE);
+		int capWidth, capHeight;
+		m_pReceiver->GetResolution(&capWidth, &capHeight);
+
+		CAutoLock cAutoLock(m_pFilter->pStateLock());
 		VIDEOINFO *pvi = (VIDEOINFO *)pMediaType->AllocFormatBuffer(sizeof(VIDEOINFO));
 		ZeroMemory(pvi, sizeof(VIDEOINFO));
 		pvi->AvgTimePerFrame = m_avgTimePerFrame;
 		BITMAPINFOHEADER *pBmi = &(pvi->bmiHeader);
 		pBmi->biSize = sizeof(BITMAPINFOHEADER);
-		pBmi->biWidth  = (_media[iMedia].width  ? _media[iMedia].width  : ((VIDEOINFO*)m_mt.pbFormat)->bmiHeader.biWidth );
-		pBmi->biHeight = (_media[iMedia].height ? _media[iMedia].height : ((VIDEOINFO*)m_mt.pbFormat)->bmiHeader.biHeight);
+		pBmi->biWidth  = capWidth;
+		pBmi->biHeight = capHeight;
 		pBmi->biPlanes = 1;
-		pBmi->biBitCount = (iPos >= (sizeof(_media)/sizeof(_media[0])) ? 32 : 24);
+		pBmi->biBitCount = iPos == 0 ? 24 : 32;
 		pBmi->biCompression = BI_RGB;
 		pvi->bmiHeader.biSizeImage = DIBSIZE(pvi->bmiHeader);
 

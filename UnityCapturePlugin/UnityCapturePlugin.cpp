@@ -143,6 +143,12 @@ extern "C" __declspec(dllexport) int CaptureSendTexture(UnityCaptureInstance* c,
 	return RET_SUCCESS;
 }
 
+extern "C" __declspec(dllexport) int CaptureSetResolution(UnityCaptureInstance* c, int width, int height)
+{
+	if (!c) return 0;
+	return c->Sender->SetResolution(width, height) ? 1 : 0;
+}
+
 // If exported by a plugin, this function will be called when graphics device is created, destroyed, and before and after it is reset (ie, resolution changed).
 extern "C" void UNITY_INTERFACE_EXPORT UnitySetGraphicsDevice(void* device, int deviceType, int eventType)
 {

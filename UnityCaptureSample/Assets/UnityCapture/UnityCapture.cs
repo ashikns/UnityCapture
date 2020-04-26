@@ -37,6 +37,8 @@ public class UnityCapture : MonoBehaviour
     public enum ECaptureSendResult { SUCCESS = 0, WARNING_FRAMESKIP = 1, WARNING_CAPTUREINACTIVE = 2, ERROR_UNSUPPORTEDGRAPHICSDEVICE = 100, ERROR_PARAMETER = 101, ERROR_TOOLARGERESOLUTION = 102, ERROR_TEXTUREFORMAT = 103, ERROR_READTEXTURE = 104, ERROR_INVALIDCAPTUREINSTANCEPTR = 200 };
 
     [SerializeField] [Tooltip("Capture device index")] public ECaptureDevice CaptureDevice = ECaptureDevice.CaptureDevice1;
+    [SerializeField] [Tooltip("Capture device width")] public int CapturerWidth = 1280;
+    [SerializeField] [Tooltip("Capture device height")] public int CapturerHeight = 720;
     [SerializeField] [Tooltip("Scale image if Unity and capture resolution don't match (can introduce frame dropping, not recommended)")] public EResizeMode ResizeMode = EResizeMode.Disabled;
     [SerializeField] [Tooltip("How many milliseconds to wait for a new frame until sending is considered to be stopped")] public int Timeout = 1000;
     [SerializeField] [Tooltip("Mirror captured output image")] public EMirrorMode MirrorMode = EMirrorMode.Disabled;
@@ -62,6 +64,11 @@ public class UnityCapture : MonoBehaviour
     void Start()
     {
         CaptureInterface = new Interface(CaptureDevice);
+
+        if (!CaptureInterface.SetResolution(CapturerWidth, CapturerHeight))
+        {
+            Debug.LogError($"Failed to set capturer resolution {CapturerWidth}x{CapturerHeight}");
+        }
     }
 
     void OnDestroy()
@@ -91,6 +98,7 @@ public class UnityCapture : MonoBehaviour
         [System.Runtime.InteropServices.DllImport("UnityCapturePlugin")] extern static System.IntPtr CaptureCreateInstance(int CapNum);
         [System.Runtime.InteropServices.DllImport("UnityCapturePlugin")] extern static void CaptureDeleteInstance(System.IntPtr instance);
         [System.Runtime.InteropServices.DllImport("UnityCapturePlugin")] extern static ECaptureSendResult CaptureSendTexture(System.IntPtr instance, System.IntPtr nativetexture, int Timeout, bool UseDoubleBuffering, EResizeMode ResizeMode, EMirrorMode MirrorMode, bool IsLinearColorSpace);
+        [System.Runtime.InteropServices.DllImport("UnityCapturePlugin")] extern static int CaptureSetResolution(System.IntPtr instance, int width, int height);
         System.IntPtr CaptureInstance;
 
         public Interface(ECaptureDevice CaptureDevice)
@@ -113,6 +121,18 @@ public class UnityCapture : MonoBehaviour
         {
             if (CaptureInstance == System.IntPtr.Zero) return ECaptureSendResult.ERROR_INVALIDCAPTUREINSTANCEPTR;
             return CaptureSendTexture(CaptureInstance, Source.GetNativeTexturePtr(), Timeout, DoubleBuffering, ResizeMode, MirrorMode, QualitySettings.activeColorSpace == ColorSpace.Linear);
+        }
+
+        public bool SetResolution(int width, int height)
+        {
+            if (CaptureInstance == System.IntPtr.Zero) return false;
+            if (width == 0 || height == 0) return false;
+            if (width % 4 != 0 || height % 4 != 0)
+            {
+                Debug.LogError("Width/height must be multiple of 4");
+                return false;
+            }
+            return CaptureSetResolution(CaptureInstance, width, height) == 1;
         }
     }
 }
