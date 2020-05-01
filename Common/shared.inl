@@ -59,7 +59,7 @@ struct SharedImageMemory
 	int32_t GetCapNum() { return m_CapNum; }
 	enum { MAX_CAPNUM = ('z' - '0') }; //see Open() for why this number
 	enum { RECEIVE_MAX_WAIT = 200 }; //How many milliseconds to wait for new frame
-	enum EFormat { FORMAT_UINT8, FORMAT_FP16_GAMMA, FORMAT_FP16_LINEAR };
+	enum EFormat { FORMAT_BGRA8 = 0, FORMAT_RGBA8 = 1, FORMAT_RGBA16_GAMMA = 2, FORMAT_RGBA16_LINEAR = 3 };
 	enum EResizeMode { RESIZEMODE_DISABLED = 0, RESIZEMODE_LINEAR = 1 };
 	enum EMirrorMode { MIRRORMODE_DISABLED = 0, MIRRORMODE_HORIZONTALLY = 1 };
 	enum EReceiveResult { RECEIVERES_CAPTUREINACTIVE, RECEIVERES_NEWFRAME, RECEIVERES_OLDFRAME };

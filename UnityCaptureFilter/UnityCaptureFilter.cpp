@@ -148,23 +148,100 @@ private:
 
 	struct ProcessJob
 	{
-		enum EType { JOB_NONE, JOB_RGBA8toBGR8, JOB_RGBA8toBGRA8, JOB_RGBA16toBGR8, JOB_RGBA16toBGRA8, JOB_BGR_RESIZE_LINEAR, JOB_BGRA_RESIZE_LINEAR, JOB_BGR_MIRROR_HORIZONTAL, JOB_BGRA_MIRROR_HORIZONTAL } Type;
+		enum EType {
+			JOB_NONE,
+			JOB_BGRA8toBGR8,
+			JOB_BGRA8toBGRA8,
+			JOB_RGBA8toBGR8,
+			JOB_RGBA8toBGRA8,
+			JOB_RGBA16toBGR8,
+			JOB_RGBA16toBGRA8,
+			JOB_BGR_RESIZE_LINEAR,
+			JOB_BGRA_RESIZE_LINEAR,
+			JOB_BGR_MIRROR_HORIZONTAL,
+			JOB_BGRA_MIRROR_HORIZONTAL
+		} Type;
+
 		const void *BufIn; void *BufOut;
 		size_t Width, RowStart, RowEnd, RGBAInStride, ResizeToHeight, ResizeFromWidth, ResizeFromHeight;
 		const uint8_t* RGBA16Table;
 
-		inline void Execute()
+        inline void Execute()
+        {
+            UCASSERT(RowEnd >= RowStart);
+            if (RowStart == RowEnd) return;
+
+            switch (Type)
+            {
+            case JOB_BGRA8toBGR8:			BGRA8toBGR8();			break;
+			case JOB_BGRA8toBGRA8:			BGRA8toBGRA8();			break;
+            case JOB_RGBA8toBGR8:			RGBA8toBGR8();			break;
+            case JOB_RGBA8toBGRA8:			RGBA8toBGRA8();			break;
+            case JOB_RGBA16toBGR8:			RGBA16toBGR8();			break;
+            case JOB_RGBA16toBGRA8:			RGBA16toBGRA8();		break;
+            case JOB_BGR_RESIZE_LINEAR:		BGRResizeLinear();		break;
+            case JOB_BGRA_RESIZE_LINEAR:	BGRAResizeLinear();		break;
+            case JOB_BGR_MIRROR_HORIZONTAL:	BGRMirrorHorizontal();	break;
+            case JOB_BGRA_MIRROR_HORIZONTAL:BGRAMirrorHorizontal();	break;
+            case JOB_NONE:
+            default:
+                break;
+            }
+        }
+
+        void BGRA8toBGR8()
+        {
+            const uint32_t* src = (const uint32_t*)BufIn + (RowStart * RGBAInStride);
+            uint8_t* dst = (uint8_t*)BufOut + (RowStart * Width * 3), * dstEnd = (uint8_t*)BufOut + (RowEnd * Width * 3);
+            if (RGBAInStride != Width)
+            {
+                //Handle a case where the texture pitch does have a gap on the right side
+                const uint32_t* srcLastRow = (const uint32_t*)BufIn + ((RowEnd - 1) * RGBAInStride);
+                for (size_t srcStride = RGBAInStride, iMax = Width; src != srcLastRow; src += srcStride)
+                    for (size_t i = 0; i != iMax; i++, dst += 3)
+                        *(uint32_t*)dst = (src[i]) & 0x00FFFFFF;
+                for (size_t i = 0, iMax = Width - 1; i != iMax; i++, dst += 3, src++)
+                    *(uint32_t*)dst = (*src) & 0x00FFFFFF;
+            }
+            else
+            {
+                //The fastest (implemented) path to convert from BGRA to BGR
+                const uint32_t* srcEnd8 = src + (((RowEnd - RowStart) * Width - 1) & ~7),
+                    * srcEnd1 = src + ((RowEnd - RowStart) * Width - 1);
+                for (; src != srcEnd8; dst += 24, src += 8)
+                {
+                    *(uint32_t*)(dst) = (src[0]) & 0x00FFFFFF;
+                    *(uint32_t*)(dst + 3) = (src[1]) & 0x00FFFFFF;
+                    *(uint32_t*)(dst + 6) = (src[2]) & 0x00FFFFFF;
+                    *(uint32_t*)(dst + 9) = (src[3]) & 0x00FFFFFF;
+                    *(uint32_t*)(dst + 12) = (src[4]) & 0x00FFFFFF;
+                    *(uint32_t*)(dst + 15) = (src[5]) & 0x00FFFFFF;
+                    *(uint32_t*)(dst + 18) = (src[6]) & 0x00FFFFFF;
+                    *(uint32_t*)(dst + 21) = (src[7]) & 0x00FFFFFF;
+                }
+                for (; src != srcEnd1; dst += 3, src++)
+                    *(uint32_t*)(dst) = (*src) & 0x00FFFFFF;
+            }
+            uint32_t FinalPixel = (*src) & 0x00FFFFFF;
+            memcpy(dst, &FinalPixel, 3);
+        }
+
+		void BGRA8toBGRA8()
 		{
-			UCASSERT(RowEnd >= RowStart);
-			if (RowStart == RowEnd) return;
-			if      (Type == JOB_RGBA8toBGR8)            RGBA8toBGR8();
-			else if (Type == JOB_RGBA8toBGRA8)           RGBA8toBGRA8();
-			else if (Type == JOB_RGBA16toBGR8)           RGBA16toBGR8();
-			else if (Type == JOB_RGBA16toBGRA8)          RGBA16toBGRA8();
-			else if (Type == JOB_BGR_RESIZE_LINEAR)      BGRResizeLinear();
-			else if (Type == JOB_BGRA_RESIZE_LINEAR)     BGRAResizeLinear();
-			else if (Type == JOB_BGR_MIRROR_HORIZONTAL)  BGRMirrorHorizontal();
-			else if (Type == JOB_BGRA_MIRROR_HORIZONTAL) BGRAMirrorHorizontal();
+			const uint32_t* src = (const uint32_t*)BufIn + (RowStart * RGBAInStride);
+			uint32_t* dst = (uint32_t*)BufOut + (RowStart * Width), * dstEnd = (uint32_t*)BufOut + (RowEnd * Width);
+			if (RGBAInStride != Width)
+			{
+				//Handle a case where the texture pitch does have a gap on the right side
+				const uint32_t* srcEnd = (const uint32_t*)BufIn + ((RowEnd)*RGBAInStride);
+				for (size_t srcStride = RGBAInStride, iMax = Width; src != srcEnd; src += srcStride)
+					for (size_t i = 0; i != iMax; i++, dst++)
+						*dst = src[i];
+			}
+			else
+			{
+				memcpy(dst, src, ((RowEnd - RowStart) * Width));
+			}
 		}
 
 		void RGBA8toBGR8()
@@ -468,10 +545,10 @@ private:
 			}
 		}
 
-		if (Format != SharedImageMemory::FORMAT_UINT8 && (!State->Owner->m_RGBA16Table || State->Owner->m_RGBA16TableFormat != Format))
+		if ((Format & 2) != 0 && (!State->Owner->m_RGBA16Table || State->Owner->m_RGBA16TableFormat != Format))
 		{
 			//Build a 64k table that maps 16 bit float values (either linear SRGB or gamma RGB) to 8 bit color values
-			const bool SRGB = (Format == SharedImageMemory::FORMAT_FP16_LINEAR);
+			const bool SRGB = (Format == SharedImageMemory::FORMAT_RGBA16_LINEAR);
 			uint8_t* RGBA16Table = State->Owner->m_RGBA16Table;
 			if (!RGBA16Table) RGBA16Table = State->Owner->m_RGBA16Table = (uint8_t*)malloc(0xFFFF+1);
 			for(int i = 0; i <= 0xFFFF; i++)
@@ -486,12 +563,31 @@ private:
 
 		//Multi-threaded conversion of RGBA source to 8-bit BGR format while also eliminating possible row gaps (when stride != width)
 		ProcessJob Job;
-		if (State->BufBPP == 4) Job.Type = (Format == SharedImageMemory::FORMAT_UINT8 ? ProcessJob::JOB_RGBA8toBGRA8 : ProcessJob::JOB_RGBA16toBGRA8);
-		else                    Job.Type = (Format == SharedImageMemory::FORMAT_UINT8 ? ProcessJob::JOB_RGBA8toBGR8  : ProcessJob::JOB_RGBA16toBGR8 );
-		Job.BufIn = InBuf, Job.BufOut = (NeedResize ? State->Owner->m_pUnscaledBuf : State->Buf);
-		Job.Width = InWidth, Job.RowStart = 0, Job.RowEnd = InHeight, Job.RGBAInStride = InStride;
-		Job.RGBA16Table = State->Owner->m_RGBA16Table;
-		State->Owner->m_ProcessWorkers.StartNewJob(Job);
+        switch (Format)
+        {
+        case SharedImageMemory::FORMAT_RGBA16_GAMMA:
+        case SharedImageMemory::FORMAT_RGBA16_LINEAR:
+            Job.Type = State->BufBPP == 4 ? ProcessJob::JOB_RGBA16toBGRA8 : ProcessJob::JOB_RGBA16toBGR8;
+            Job.BufIn = InBuf, Job.BufOut = (NeedResize ? State->Owner->m_pUnscaledBuf : State->Buf);
+            Job.Width = InWidth, Job.RowStart = 0, Job.RowEnd = InHeight, Job.RGBAInStride = InStride;
+            Job.RGBA16Table = State->Owner->m_RGBA16Table;
+            State->Owner->m_ProcessWorkers.StartNewJob(Job);
+            break;
+        case SharedImageMemory::FORMAT_RGBA8:
+            Job.Type = State->BufBPP == 4 ? ProcessJob::JOB_RGBA8toBGRA8 : ProcessJob::JOB_RGBA8toBGR8;
+            Job.BufIn = InBuf, Job.BufOut = (NeedResize ? State->Owner->m_pUnscaledBuf : State->Buf);
+            Job.Width = InWidth, Job.RowStart = 0, Job.RowEnd = InHeight, Job.RGBAInStride = InStride;
+            State->Owner->m_ProcessWorkers.StartNewJob(Job);
+            break;
+        case SharedImageMemory::FORMAT_BGRA8:
+			Job.Type = State->BufBPP == 4 ? ProcessJob::JOB_BGRA8toBGRA8 : ProcessJob::JOB_BGRA8toBGR8;
+			Job.BufIn = InBuf, Job.BufOut = (NeedResize ? State->Owner->m_pUnscaledBuf : State->Buf);
+			Job.Width = InWidth, Job.RowStart = 0, Job.RowEnd = InHeight, Job.RGBAInStride = InStride;
+			State->Owner->m_ProcessWorkers.StartNewJob(Job);
+			break;
+        default:
+            break;
+        }
 
 		if (NeedResize)
 		{
